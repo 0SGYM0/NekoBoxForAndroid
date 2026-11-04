@@ -5,7 +5,7 @@ on:
 jobs:
   libcore:
     name: Native Build (LibCore)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
         run: ./run lib core
   build:
     name: Build OSS APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - libcore
     steps:
@@ -66,4 +66,3 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: APKs
-          path: ${{ env.APK }}
