@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.text.format.Formatter
 import android.util.AttributeSet
-import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
@@ -37,21 +36,7 @@ class StatsBar @JvmOverloads constructor(
     /** 上滑手势回调（用于展开 IP 检测详情） */
     var onSwipeUp: (() -> Unit)? = null
 
-    private val gestureDetector = GestureDetector(
-        context,
-        object : GestureDetector.SimpleOnGestureListener() {
-            override fun onFling(
-                e1: MotionEvent, e2: MotionEvent,
-                velocityX: Float, velocityY: Float,
-            ): Boolean {
-                if (velocityY < -2000 && Math.abs(velocityY) > Math.abs(velocityX)) {
-                    onSwipeUp?.invoke()
-                    return true
-                }
-                return false
-            }
-        },
-    )
+    private var downY = 0f
 
     override fun getBehavior(): YourBehavior {
         if (!this::behavior.isInitialized) behavior = YourBehavior { allowShow }
@@ -99,7 +84,13 @@ class StatsBar @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        gestureDetector.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> downY = event.y
+            MotionEvent.ACTION_UP -> {
+                val dy = downY - event.y
+                if (dy > 60f) onSwipeUp?.invoke()
+            }
+        }
         return super.onTouchEvent(event)
     }
 
