@@ -74,10 +74,9 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
         val box = card()
         header(box, "${context.getString(R.string.ipcheck_score)} $score")
         val assessment = ServiceRegion.assess(service, r.ip, r.countryCode, r.trustScore)
-        if (assessment.status != ServiceRegion.Status.NOT_APPLICABLE) {
+        if (assessment.status == ServiceRegion.Status.RESTRICTED || assessment.status == ServiceRegion.Status.UNKNOWN) {
             val message = when (assessment.status) {
                 ServiceRegion.Status.RESTRICTED -> context.getString(R.string.ipcheck_service_restricted, r.countryCode.trim().uppercase(Locale.ROOT))
-                ServiceRegion.Status.NOT_LISTED -> context.getString(R.string.ipcheck_service_not_listed)
                 else -> context.getString(R.string.ipcheck_service_unknown)
             }
             box.addView(text(message, 14f, true).apply {
@@ -87,8 +86,6 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
                     setStroke(dp(2), color(if (assessment.status == ServiceRegion.Status.RESTRICTED) com.google.android.material.R.attr.colorError else android.R.attr.textColorSecondary))
                 }
             }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(7) })
-            val siteScore = assessment.siteScore?.let { "$it / 100" } ?: unknown
-            row(box, context.getString(R.string.ipcheck_site_score), siteScore)
         }
         box.addView(text(known(r.ip), 19f, true).apply {
             setPadding(0, dp(8), 0, 0)

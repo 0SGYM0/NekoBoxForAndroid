@@ -65,8 +65,21 @@ class ThemeInflationTest {
                             humanLabel = "", flags = emptyList(), isIpv6 = false, scenes = emptyMap(),
                             aiRestricted = false, aiRestrictedName = null
                         )
-                        card.showReport(report, ServiceRegion.Service.CHATGPT)
-                        card.showReport(report, ServiceRegion.Service.CLAUDE)
+                        for (service in listOf(ServiceRegion.Service.CHATGPT, ServiceRegion.Service.CLAUDE)) {
+                            card.showReport(report, service)
+                            fun texts(view: android.view.View): List<String> =
+                                (if (view is TextView) listOf(view.text.toString()) else emptyList()) +
+                                    (if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { texts(view.getChildAt(it)) } else emptyList())
+                            val rendered = texts(card)
+                            assertTrue(rendered.any { it.contains(context.getString(R.string.ipcheck_score)) && it.contains("80 / 100") })
+                            assertFalse(rendered.contains(context.getString(R.string.ipcheck_site_score)))
+                            assertFalse(rendered.contains(context.getString(R.string.ipcheck_service_not_listed)))
+                            when (country) {
+                                "CN" -> assertTrue(rendered.contains(context.getString(R.string.ipcheck_service_restricted, "CN")))
+                                "US" -> assertFalse(rendered.contains(context.getString(R.string.ipcheck_service_unknown)))
+                                else -> assertTrue(rendered.contains(context.getString(R.string.ipcheck_service_unknown)))
+                            }
+                        }
                     }
                 }
             }

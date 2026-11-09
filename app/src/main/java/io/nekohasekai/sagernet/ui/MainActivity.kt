@@ -462,23 +462,39 @@ class MainActivity : ThemedActivity(),
 
     private fun initIpCheckPanel() {
         val panel = binding.ipcheckPanel
-        // Use the actual coordinator bounds, not physical display metrics: split-screen,
-        // rotation and system insets can all change the space available to this panel.
-        fun updatePanelHeight(availableHeight: Int) {
-            if (availableHeight <= 0) return
-            val newHeight = (availableHeight * 0.8f).toInt().coerceAtLeast(1)
-            if (panelHeight == newHeight.toFloat()) return
+        // Compare window-relative bounds with insets, avoiding double subtraction when the
+        // framework already fits the content. Cover the entire safe content area.
+        fun updatePanelBounds() {
+            val coordinator = binding.coordinator
+            if (coordinator.width <= 0 || coordinator.height <= 0) return
+            val decor = window.decorView
+            val location = IntArray(2)
+            coordinator.getLocationInWindow(location)
+            val insets = androidx.core.view.ViewCompat.getRootWindowInsets(coordinator)
+                ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() or androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+            val bounds = IpPanelGeometry.calculate(coordinator.width, coordinator.height, location[0], location[1],
+                decor.width, decor.height, insets?.left ?: 0, insets?.top ?: 0, insets?.right ?: 0, insets?.bottom ?: 0)
+            val params = panel.layoutParams as androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+            if (params.height == bounds.height && params.leftMargin == bounds.left &&
+                params.rightMargin == bounds.right && params.bottomMargin == bounds.bottom) return
             panel.animate().cancel()
             val hiddenFraction = if (panel.visibility != View.VISIBLE || panelHeight <= 0f) 1f
                 else (panel.translationY / panelHeight).coerceIn(0f, 1f)
-            panelHeight = newHeight.toFloat()
-            panel.layoutParams = panel.layoutParams.apply { height = newHeight }
+            panelHeight = bounds.height.toFloat()
+            params.height = bounds.height
+            params.leftMargin = bounds.left
+            params.rightMargin = bounds.right
+            params.bottomMargin = bounds.bottom
+            panel.layoutParams = params
             panel.translationY = panelHeight * hiddenFraction
         }
-        binding.coordinator.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
-            if (bottom - top != oldBottom - oldTop) updatePanelHeight(bottom - top)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.coordinator) { _, insets ->
+            binding.coordinator.post { updatePanelBounds() }
+            insets
         }
-        binding.coordinator.post { updatePanelHeight(binding.coordinator.height) }
+        binding.coordinator.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updatePanelBounds() }
+        binding.coordinator.post { updatePanelBounds() }
+        androidx.core.view.ViewCompat.requestApplyInsets(binding.coordinator)
         binding.stats.setPanelDragHandle(panel.findViewById(R.id.ipcheck_drag_handle))
         panel.findViewById<TextView>(R.id.ipcheck_refresh).setOnClickListener { requestIpCheck(forceRefresh = true) }
     }
