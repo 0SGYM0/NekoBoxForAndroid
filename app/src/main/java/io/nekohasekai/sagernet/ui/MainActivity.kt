@@ -542,12 +542,15 @@ class MainActivity : ThemedActivity(),
         else ipExitView(exit).showState(getString(R.string.ipcheck_status_error, getString(R.string.ipcheck_retry_hint)))
         if (exit == IpChecker.Exit.CHATGPT) {
             val assessment = report?.let { io.nekohasekai.sagernet.ipcheck.ServiceRegion.assess(service, it.ip, it.countryCode, it.trustScore) }
-            val summary = when (io.nekohasekai.sagernet.ipcheck.ServiceRegion.bar(assessment)) {
-                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.RESTRICTED -> getString(R.string.ipcheck_bar_restricted)
-                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.NOT_LISTED -> getString(R.string.ipcheck_bar_not_listed)
-                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.UNKNOWN -> getString(R.string.ipcheck_bar_unknown)
+            val parts = io.nekohasekai.sagernet.ipcheck.IpBarSummary.parts(report?.trustScore, report?.scoreLabel, assessment)
+            val score = parts.score?.toString() ?: getString(R.string.ipcheck_unknown)
+            val suffix = when (parts.region) {
+                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.RESTRICTED -> getString(R.string.ipcheck_bar_suffix_restricted)
+                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.NOT_LISTED -> null
+                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.UNKNOWN -> getString(R.string.ipcheck_bar_suffix_unknown)
             }
-            binding.stats.updateIpSummary(summary)
+            val detail = listOfNotNull(score, parts.label, suffix).joinToString(" ")
+            binding.stats.updateIpSummary(getString(R.string.ipcheck_bar_score, detail))
         }
     }
 

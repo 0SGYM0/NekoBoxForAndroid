@@ -594,7 +594,11 @@
     <string name="ipcheck_geo">Location</string>
     <string name="ipcheck_score">IP reputation</string>
     <string name="ipcheck_service_restricted">⚠ Region restricted (%1$s): listed by source rules</string>
-    <string name="ipcheck_service_not_listed">Region not listed as restricted (not an availability guarantee)</string>
+    <string name="ipcheck_service_not_listed">Region not listed as restricted</string>
+    <string name="ipcheck_notice">Note: Traffic share is estimated when radar data is missing. Scene scores are rule-based, not live availability tests or account predictions. A region not listed as restricted is not guaranteed to work.</string>
+    <string name="ipcheck_bar_score">GPT %1$s</string>
+    <string name="ipcheck_bar_suffix_restricted">Restricted</string>
+    <string name="ipcheck_bar_suffix_unknown">Region unknown</string>
     <string name="ipcheck_service_unknown">Region status unknown</string>
     <string name="ipcheck_site_score">Source service score</string>
     <string name="ipcheck_site_caveat">Estimated from source region rules, not a live access test or account outcome prediction.</string>

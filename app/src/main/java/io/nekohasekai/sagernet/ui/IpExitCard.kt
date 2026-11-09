@@ -89,7 +89,6 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
             }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(7) })
             val siteScore = assessment.siteScore?.let { "$it / 100" } ?: unknown
             row(box, context.getString(R.string.ipcheck_site_score), siteScore)
-            box.addView(text(context.getString(R.string.ipcheck_site_caveat), 12f, secondary = true))
         }
         box.addView(text(known(r.ip), 19f, true).apply {
             setPadding(0, dp(8), 0, 0)
@@ -124,8 +123,6 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
                 "${context.getString(label)} ${if (value == null) unknown else String.format(Locale.ROOT, "%.0f/10", value)}"
             }.joinToString(" · ")
             row(box, context.getString(R.string.ipcheck_scenes), scenes)
-            if (human != null) box.addView(text(context.getString(R.string.ipcheck_human_caveat), 11f, secondary = true).apply { setPadding(0, dp(3), 0, 0) })
-            if (r.scenes.isNotEmpty()) box.addView(text(context.getString(R.string.ipcheck_scene_caveat), 11f, secondary = true))
         }
     }
 }
