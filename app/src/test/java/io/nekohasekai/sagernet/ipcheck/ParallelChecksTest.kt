@@ -22,7 +22,7 @@ class ParallelChecksTest {
                 i * 10
             }) { i, result -> published.add(i to result) }
         }
-        yield()
+        while (started.size < 3) yield()
         assertEquals(listOf(0, 1, 2), started)
         gates[2].complete(Unit)
         yield()
