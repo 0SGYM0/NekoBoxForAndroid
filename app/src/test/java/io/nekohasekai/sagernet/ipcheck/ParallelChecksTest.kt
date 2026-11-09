@@ -40,13 +40,14 @@ class ParallelChecksTest {
 
     @Test fun cancelledRunCannotPublishLateResults() = runBlocking {
         val gate = CompletableDeferred<Unit>()
+        val started = CompletableDeferred<Unit>()
         val published = mutableListOf<String>()
         val old = async {
-            parallelChecks(listOf("old"), { gate.await(); it }) { _, result ->
+            parallelChecks(listOf("old"), { started.complete(Unit); gate.await(); it }) { _, result ->
                 published.add(result.getOrThrow())
             }
         }
-        yield()
+        started.await()
         old.cancelAndJoin()
         parallelChecks(listOf("new"), { it }) { _, result -> published.add(result.getOrThrow()) }
         gate.complete(Unit)
