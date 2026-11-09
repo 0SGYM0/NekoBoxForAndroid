@@ -397,8 +397,6 @@ class MainActivity : ThemedActivity(),
             ipConnected = connected
             invalidateIpCheck()
             if (connected) requestIpCheck(forceRefresh = false)
-        } else if (!connected) {
-            setPanelStatus(R.string.ipcheck_status_disconnected)
         }
         if (msg != null) snackbar(getString(R.string.vpn_error, msg)).show()
     }
@@ -410,13 +408,11 @@ class MainActivity : ThemedActivity(),
         ipCheckJob = null
         cachedIpResult = null
         clearIpCheckDisplay()
-        if (!ipConnected) setPanelStatus(R.string.ipcheck_status_disconnected)
     }
 
     /** Automatic detection and the panel share one result for this connection. */
     private fun requestIpCheck(forceRefresh: Boolean) {
         if (!ipConnected || !DataStore.serviceState.connected) {
-            setPanelStatus(R.string.ipcheck_status_disconnected)
             return
         }
         if (ipCheckJob?.isActive == true && !forceRefresh) return
@@ -429,7 +425,6 @@ class MainActivity : ThemedActivity(),
         cachedIpResult = null
         clearIpCheckDisplay()
         IpChecker.Exit.values().forEach { exit -> ipExitView(exit).showState(getString(R.string.ipcheck_status_detecting)) }
-        setPanelStatus(R.string.ipcheck_status_detecting)
         ipCheckJob = lifecycleScope.launch {
             val results = mutableMapOf<IpChecker.Exit, Result<io.nekohasekai.sagernet.ipcheck.IpReport>>()
             IpChecker.detectEach { exit, result ->
@@ -440,7 +435,6 @@ class MainActivity : ThemedActivity(),
             }
             if (isCurrentIpCheck(generation, requestId)) {
                 cachedIpResult = results.toMap()
-                setPanelStatus(if (results.values.any { it.isFailure }) R.string.ipcheck_status_partial else R.string.ipcheck_status_done)
             }
         }
     }
@@ -496,7 +490,13 @@ class MainActivity : ThemedActivity(),
         binding.coordinator.post { updatePanelBounds() }
         androidx.core.view.ViewCompat.requestApplyInsets(binding.coordinator)
         binding.stats.setPanelDragHandle(panel.findViewById(R.id.ipcheck_drag_handle))
-        panel.findViewById<TextView>(R.id.ipcheck_refresh).setOnClickListener { requestIpCheck(forceRefresh = true) }
+        panel.findViewById<io.nekohasekai.sagernet.widget.PanelScrollView>(R.id.ipcheck_scroll).apply {
+            onPanelDragStart = { this@MainActivity.onPanelDragStart() }
+            onPanelDrag = { this@MainActivity.onPanelDrag(it) }
+            onPanelDragEnd = { this@MainActivity.onPanelDragEnd(it) }
+            onPanelDragCancel = { this@MainActivity.onPanelDragCancel() }
+        }
+        panel.findViewById<View>(R.id.ipcheck_refresh).setOnClickListener { requestIpCheck(forceRefresh = true) }
     }
 
     private fun onPanelDragStart() {
@@ -565,13 +565,9 @@ class MainActivity : ThemedActivity(),
                 io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.NOT_LISTED -> null
                 io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.UNKNOWN -> getString(R.string.ipcheck_bar_suffix_unknown)
             }
-            val detail = listOfNotNull(score, parts.label, suffix).joinToString(" ")
-            binding.stats.updateIpSummary(getString(R.string.ipcheck_bar_score, detail))
+            val detail = listOfNotNull(parts.label, suffix).joinToString(" ")
+            binding.stats.updateIpSummary(getString(R.string.ipcheck_bar_score, score) + if (detail.isNotEmpty()) "\n$detail" else "")
         }
-    }
-
-    private fun setPanelStatus(resId: Int) {
-        binding.ipcheckPanel.findViewById<TextView>(R.id.ipcheck_status).setText(resId)
     }
 
     override fun snackbarInternal(text: CharSequence): Snackbar {

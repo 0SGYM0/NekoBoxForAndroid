@@ -7,58 +7,46 @@
     android:background="?attr/colorSurface"
     android:paddingBottom="12dp">
 
-    <!-- 手柄专供面板拖动；内容区域仍保留独立滚动和文本选择。 -->
-    <LinearLayout
-        android:id="@+id/ipcheck_drag_handle"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:gravity="center"
-        android:orientation="vertical"
+        android:layout_height="56dp"
         android:background="?attr/colorMaterial300">
-
-        <View
-            android:layout_width="36dp"
-            android:layout_height="4dp"
-            android:layout_marginBottom="4dp"
-            android:alpha="0.7"
-            android:background="?whiteOrTextPrimary" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/ipcheck_title"
-            android:textColor="?whiteOrTextPrimary"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="8dp">
-
-        <TextView
-            android:id="@+id/ipcheck_status"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textSize="14sp"
-            android:text="@string/ipcheck_status_idle" />
-
-        <TextView
+        <LinearLayout
+            android:id="@+id/ipcheck_drag_handle"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="56dp">
+            <View
+                android:layout_width="36dp"
+                android:layout_height="4dp"
+                android:layout_marginBottom="4dp"
+                android:alpha="0.7"
+                android:background="@drawable/ipcheck_handle" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/ipcheck_title"
+                android:textColor="?whiteOrTextPrimary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/ipcheck_refresh"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            android:textColor="?attr/colorAccent"
-            android:textSize="14sp"
-            android:text="@string/ipcheck_refresh" />
-    </LinearLayout>
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="end|bottom"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/ipcheck_refresh"
+            android:src="@drawable/ic_ipcheck_refresh"
+            app:tint="?whiteOrTextPrimary" />
+    </FrameLayout>
 
-    <androidx.core.widget.NestedScrollView
+    <io.nekohasekai.sagernet.widget.PanelScrollView
+        android:id="@+id/ipcheck_scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -112,6 +100,6 @@
             </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+    </io.nekohasekai.sagernet.widget.PanelScrollView>
 
 </LinearLayout>
