@@ -529,4 +529,11 @@
     <string name="ipcheck_scene_social">社媒运营</string>
     <string name="ipcheck_scene_ai">AI 应用</string>
     <string name="ipcheck_refresh">刷新</string>
+    <string name="ipcheck_unknown">未知</string>
+    <string name="ipcheck_exit_ip">出口 IP</string>
+    <string name="ipcheck_details">IP 信息 / 类型</string>
+    <string name="ipcheck_type">类型</string>
+    <string name="ipcheck_human_ratio">人类 %1$d%%  /  机器 %2$d%%</string>
+    <string name="ipcheck_human_caveat">雷达数据缺失时，人机比例为估算值。</string>
+    <string name="ipcheck_scene_caveat">基于规则的估算，仅供参考，不代表服务实际可用。</string>
 </resources>

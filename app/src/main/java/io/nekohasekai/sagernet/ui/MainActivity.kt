@@ -44,7 +44,6 @@ import io.nekohasekai.sagernet.fmt.PluginEntry
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ipcheck.IpChecker
-import io.nekohasekai.sagernet.ipcheck.IpReportRenderer
 import io.nekohasekai.sagernet.ktx.alert
 import io.nekohasekai.sagernet.ktx.isPlay
 import io.nekohasekai.sagernet.ktx.isPreview
@@ -429,7 +428,7 @@ class MainActivity : ThemedActivity(),
         val generation = ipGeneration
         cachedIpResult = null
         clearIpCheckDisplay()
-        IpChecker.Exit.values().forEach { exit -> ipExitView(exit).setText(R.string.ipcheck_status_detecting) }
+        IpChecker.Exit.values().forEach { exit -> ipExitView(exit).showState(getString(R.string.ipcheck_status_detecting)) }
         setPanelStatus(R.string.ipcheck_status_detecting)
         ipCheckJob = lifecycleScope.launch {
             val results = mutableMapOf<IpChecker.Exit, Result<io.nekohasekai.sagernet.ipcheck.IpReport>>()
@@ -452,10 +451,7 @@ class MainActivity : ThemedActivity(),
 
     private fun clearIpCheckDisplay() {
         binding.stats.updateIpSummary("")
-        val panel = binding.ipcheckPanel
-        panel.findViewById<TextView>(R.id.ipcheck_default).text = ""
-        panel.findViewById<TextView>(R.id.ipcheck_chatgpt).text = ""
-        panel.findViewById<TextView>(R.id.ipcheck_claude).text = ""
+        IpChecker.Exit.values().forEach { ipExitView(it).clear() }
     }
 
     // ============ IP 检测面板（跟手展开） ============
@@ -529,7 +525,7 @@ class MainActivity : ThemedActivity(),
         }.start()
     }
 
-    private fun ipExitView(exit: IpChecker.Exit): TextView = binding.ipcheckPanel.findViewById(when (exit) {
+    private fun ipExitView(exit: IpChecker.Exit): IpExitCard = binding.ipcheckPanel.findViewById(when (exit) {
         IpChecker.Exit.DEFAULT -> R.id.ipcheck_default
         IpChecker.Exit.CHATGPT -> R.id.ipcheck_chatgpt
         IpChecker.Exit.CLAUDE -> R.id.ipcheck_claude
@@ -537,8 +533,8 @@ class MainActivity : ThemedActivity(),
 
     private fun renderIpExit(exit: IpChecker.Exit, result: Result<io.nekohasekai.sagernet.ipcheck.IpReport>) {
         val report = result.getOrNull()
-        ipExitView(exit).text = if (report != null) IpReportRenderer.render(this, report)
-            else getString(R.string.ipcheck_status_error, getString(R.string.ipcheck_retry_hint))
+        if (report != null) ipExitView(exit).showReport(report)
+        else ipExitView(exit).showState(getString(R.string.ipcheck_status_error, getString(R.string.ipcheck_retry_hint)))
         if (exit == IpChecker.Exit.CHATGPT) {
             val summary = if (report != null && report.trustScore >= 0)
                 "GPT ${report.trustScore} ${report.scoreLabel}".trimEnd() else ""

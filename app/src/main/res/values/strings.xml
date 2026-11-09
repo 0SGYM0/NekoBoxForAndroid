@@ -609,4 +609,11 @@
     <string name="ipcheck_scene_social">Social</string>
     <string name="ipcheck_scene_ai">AI Apps</string>
     <string name="ipcheck_refresh">Refresh</string>
+    <string name="ipcheck_unknown">Unknown</string>
+    <string name="ipcheck_exit_ip">EXIT IP</string>
+    <string name="ipcheck_details">IP details</string>
+    <string name="ipcheck_type">Type</string>
+    <string name="ipcheck_human_ratio">Human %1$d%%  /  Bot %2$d%%</string>
+    <string name="ipcheck_human_caveat">Traffic share may be estimated when radar data is unavailable.</string>
+    <string name="ipcheck_scene_caveat">Heuristic estimates only; not a service availability test.</string>
 </resources>
