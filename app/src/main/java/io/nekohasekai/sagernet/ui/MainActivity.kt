@@ -565,8 +565,8 @@ class MainActivity : ThemedActivity(),
                 io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.NOT_LISTED -> null
                 io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.UNKNOWN -> getString(R.string.ipcheck_bar_suffix_unknown)
             }
-            val detail = listOfNotNull(parts.label, suffix).joinToString(" ")
-            binding.stats.updateIpSummary(getString(R.string.ipcheck_bar_score, score) + if (detail.isNotEmpty()) "\n$detail" else "")
+            binding.stats.updateIpSummary(io.nekohasekai.sagernet.ipcheck.IpBarSummary.format(
+                getString(R.string.ipcheck_bar_score, score), parts.label, suffix))
         }
     }
 
