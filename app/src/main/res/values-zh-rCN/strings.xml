@@ -526,4 +526,5 @@
     <string name="ipcheck_scene_tiktok">TikTok</string>
     <string name="ipcheck_scene_social">社媒运营</string>
     <string name="ipcheck_scene_ai">AI 应用</string>
+    <string name="ipcheck_refresh">刷新</string>
 </resources>

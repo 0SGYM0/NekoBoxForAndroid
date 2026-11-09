@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.ipcheck
 
+import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -337,5 +338,84 @@ object IpChecker {
             chatgpt = detectOne(TRACE_CHATGPT),
             claude = detectOne(TRACE_CLAUDE),
         )
+    }
+}
+
+/** 把 IpReport 渲染成多行文本（供面板 / BottomSheet 复用） */
+object IpReportRenderer {
+
+    fun render(context: android.content.Context, r: IpReport): String {
+        val sb = StringBuilder()
+        sb.append(r.ip).append('\n')
+
+        val geo = listOf(r.country, r.region, r.city).filter { it.isNotBlank() }.joinToString(" · ")
+        if (geo.isNotBlank()) {
+            sb.append(context.getString(R.string.ipcheck_geo)).append(' ').append(geo).append('\n')
+        }
+
+        if (r.trustScore >= 0) {
+            sb.append(context.getString(R.string.ipcheck_score))
+                .append(' ').append(r.trustScore)
+                .append(' ').append(r.scoreLabel).append('\n')
+        }
+
+        if (r.isNative || r.isBroadcast) {
+            val nativeText = if (r.isNative) context.getString(R.string.ipcheck_native)
+            else context.getString(R.string.ipcheck_broadcast)
+            sb.append(context.getString(R.string.ipcheck_native_label)).append(' ').append(nativeText).append('\n')
+        }
+        if (r.isDatacenter) {
+            sb.append(context.getString(R.string.ipcheck_datacenter)).append('\n')
+        } else if (r.isResidential) {
+            sb.append(context.getString(R.string.ipcheck_residential)).append('\n')
+        }
+
+        val org = listOf(r.companyName, r.isp).filter { it.isNotBlank() }.distinct().joinToString(" · ")
+        if (org.isNotBlank()) {
+            sb.append(context.getString(R.string.ipcheck_provider)).append(' ').append(org).append('\n')
+        }
+        if (r.asn.isNotBlank()) {
+            val asnText = if (r.asOrganization.isNotBlank()) "AS${r.asn} · ${r.asOrganization}" else "AS${r.asn}"
+            sb.append(context.getString(R.string.ipcheck_asn)).append(' ').append(asnText).append('\n')
+        }
+
+        if (r.humanPercent != null) {
+            val bot = 100 - r.humanPercent
+            sb.append(context.getString(R.string.ipcheck_human))
+                .append(" 人类 ").append(r.humanPercent).append("% / 机器 ").append(bot).append("%")
+                .append("（").append(r.humanLabel).append("）").append('\n')
+        } else if (r.humanLabel.isNotBlank()) {
+            sb.append(context.getString(R.string.ipcheck_human)).append(' ').append(r.humanLabel).append('\n')
+        }
+
+        if (r.flags.isNotEmpty()) {
+            sb.append(context.getString(R.string.ipcheck_flags)).append(' ').append(r.flags.joinToString("、")).append('\n')
+        }
+
+        if (r.scenes.isNotEmpty()) {
+            val sceneParts = listOf("tiktok", "social", "ai").mapNotNull { key ->
+                r.scenes[key]?.let { renderScene(context, key, it) }
+            }
+            if (sceneParts.isNotEmpty()) {
+                sb.append(context.getString(R.string.ipcheck_scenes)).append(' ').append(sceneParts.joinToString(" · ")).append('\n')
+            }
+        } else if (r.isIpv6) {
+            sb.append(context.getString(R.string.ipcheck_scenes)).append(' ').append(context.getString(R.string.ipcheck_ipv6_na)).append('\n')
+        }
+
+        sb.append(context.getString(R.string.ipcheck_ai_region))
+            .append(' ').append(if (r.aiRestricted) "受限（${r.aiRestrictedName ?: r.countryCode}）" else "正常")
+            .append('\n')
+
+        return sb.toString().trimEnd()
+    }
+
+    private fun renderScene(context: android.content.Context, key: String, s: SceneScore): String {
+        val name = when (key) {
+            "tiktok" -> context.getString(R.string.ipcheck_scene_tiktok)
+            "social" -> context.getString(R.string.ipcheck_scene_social)
+            else -> context.getString(R.string.ipcheck_scene_ai)
+        }
+        return "$name ${s.verdict}"
     }
 }

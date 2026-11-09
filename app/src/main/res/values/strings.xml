@@ -606,4 +606,5 @@
     <string name="ipcheck_scene_tiktok">TikTok</string>
     <string name="ipcheck_scene_social">Social</string>
     <string name="ipcheck_scene_ai">AI Apps</string>
+    <string name="ipcheck_refresh">Refresh</string>
 </resources>

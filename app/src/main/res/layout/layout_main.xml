@@ -43,6 +43,16 @@
             app:pressedTranslationZ="6dp"
             app:srcCompat="@drawable/ic_service_idle" />
 
+        <FrameLayout
+            android:id="@+id/ipcheck_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:visibility="invisible">
+
+            <include layout="@layout/layout_ipcheck_panel" />
+        </FrameLayout>
+
         <io.nekohasekai.sagernet.widget.StatsBar
             android:id="@+id/stats"
             android:layout_width="match_parent"

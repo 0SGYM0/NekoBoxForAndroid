@@ -10,6 +10,8 @@ import android.os.Bundle
 import android.os.RemoteException
 import android.view.KeyEvent
 import android.view.MenuItem
+import android.view.View
+import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.annotation.IdRes
 import androidx.core.app.ActivityCompat
@@ -41,6 +43,7 @@ import io.nekohasekai.sagernet.fmt.PluginEntry
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ipcheck.IpChecker
+import io.nekohasekai.sagernet.ipcheck.IpReportRenderer
 import io.nekohasekai.sagernet.ktx.alert
 import io.nekohasekai.sagernet.ktx.isPlay
 import io.nekohasekai.sagernet.ktx.isPreview
@@ -93,9 +96,11 @@ class MainActivity : ThemedActivity(),
             )
         }
         binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
-        binding.stats.onSwipeUp = { IpCheckFragment.show(this) }
+        binding.stats.onSwipeUp = { dy -> onPanelDrag(dy) }
+        binding.stats.onSwipeUpEnd = { dy -> onPanelDragEnd(dy) }
 
         setContentView(binding.root)
+        initIpCheckPanel()
         changeState(BaseService.State.Idle)
         connection.connect(this, this)
         DataStore.configurationStore.registerChangeListener(this)
@@ -342,8 +347,8 @@ class MainActivity : ThemedActivity(),
             R.id.nav_traffic -> displayFragment(WebviewFragment())
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_ipcheck -> {
-                IpCheckFragment.show(this)
                 binding.drawerLayout.closeDrawers()
+                showIpCheckPanel()
                 return false
             }
             R.id.nav_logcat -> displayFragment(LogcatFragment())
@@ -398,6 +403,81 @@ class MainActivity : ThemedActivity(),
                 }
             }
         }
+    }
+
+    // ============ IP 检测面板（跟手展开） ============
+
+    private var panelHeight = 0f
+
+    private fun initIpCheckPanel() {
+        val panel = binding.ipcheckPanel
+        val maxH = (resources.displayMetrics.heightPixels * 0.8f).toInt()
+        panel.layoutParams = panel.layoutParams.apply { height = maxH }
+        panel.post {
+            panelHeight = panel.height.toFloat()
+            panel.translationY = panelHeight
+        }
+        panel.findViewById<TextView>(R.id.ipcheck_refresh).setOnClickListener { runIpCheck() }
+    }
+
+    private fun onPanelDrag(dy: Float) {
+        val panel = binding.ipcheckPanel
+        if (panel.visibility != View.VISIBLE) {
+            panel.visibility = View.VISIBLE
+            panel.translationY = panelHeight
+        }
+        panel.translationY = (panelHeight - dy).coerceIn(0f, panelHeight)
+    }
+
+    private fun onPanelDragEnd(dy: Float) {
+        val panel = binding.ipcheckPanel
+        if (dy > panelHeight * 0.25f) {
+            panel.animate().translationY(0f).setDuration(180).start()
+            runIpCheck()
+        } else {
+            panel.animate().translationY(panelHeight).setDuration(180).withEndAction {
+                panel.visibility = View.INVISIBLE
+            }.start()
+        }
+    }
+
+    private fun showIpCheckPanel() {
+        val panel = binding.ipcheckPanel
+        panel.visibility = View.VISIBLE
+        panel.animate().translationY(0f).setDuration(250).start()
+        runIpCheck()
+    }
+
+    private fun runIpCheck() {
+        if (!DataStore.serviceState.connected) {
+            setPanelStatus(R.string.ipcheck_status_disconnected)
+            return
+        }
+        setPanelStatus(R.string.ipcheck_status_detecting)
+        runOnDefaultDispatcher {
+            try {
+                val result = IpChecker.detect()
+                onMainDispatcher {
+                    renderIpCheck(result)
+                    setPanelStatus(R.string.ipcheck_status_done)
+                }
+            } catch (e: Exception) {
+                onMainDispatcher {
+                    setPanelStatus(R.string.ipcheck_status_error)
+                }
+            }
+        }
+    }
+
+    private fun renderIpCheck(result: IpChecker.DetectResult) {
+        val panel = binding.ipcheckPanel
+        panel.findViewById<TextView>(R.id.ipcheck_default).text = IpReportRenderer.render(this, result.default)
+        panel.findViewById<TextView>(R.id.ipcheck_chatgpt).text = IpReportRenderer.render(this, result.chatgpt)
+        panel.findViewById<TextView>(R.id.ipcheck_claude).text = IpReportRenderer.render(this, result.claude)
+    }
+
+    private fun setPanelStatus(resId: Int) {
+        binding.ipcheckPanel.findViewById<TextView>(R.id.ipcheck_status).setText(resId)
     }
 
     override fun snackbarInternal(text: CharSequence): Snackbar {

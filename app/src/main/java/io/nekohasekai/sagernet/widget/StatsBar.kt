@@ -33,10 +33,14 @@ class StatsBar @JvmOverloads constructor(
 
     var allowShow = true
 
-    /** 上滑手势回调（用于展开 IP 检测详情） */
-    var onSwipeUp: (() -> Unit)? = null
+    /** 上滑过程中实时回调（dy 为上滑距离，用于跟手） */
+    var onSwipeUp: ((dy: Float) -> Unit)? = null
+
+    /** 上滑松手回调（dy 为最终上滑距离，用于决定展开/收起） */
+    var onSwipeUpEnd: ((dy: Float) -> Unit)? = null
 
     private var downY = 0f
+    private var swiping = false
 
     override fun getBehavior(): YourBehavior {
         if (!this::behavior.isInitialized) behavior = YourBehavior { allowShow }
@@ -85,10 +89,22 @@ class StatsBar @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> downY = event.y
-            MotionEvent.ACTION_UP -> {
+            MotionEvent.ACTION_DOWN -> {
+                downY = event.y
+                swiping = false
+            }
+            MotionEvent.ACTION_MOVE -> {
                 val dy = downY - event.y
-                if (dy > 60f) onSwipeUp?.invoke()
+                if (dy > 20f) {
+                    swiping = true
+                    onSwipeUp?.invoke(dy)
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                if (swiping) {
+                    onSwipeUpEnd?.invoke(downY - event.y)
+                }
+                swiping = false
             }
         }
         return super.onTouchEvent(event)
