@@ -165,8 +165,8 @@ object IpChecker {
         val pv = d.optBoolean("is_proxy") || d.optBoolean("is_vpn") || d.optBoolean("is_tor")
 
         val intel = d.optJSONObject("intelligence")
-        val abuserScoreRaw = intel?.optString("abuser_score_raw", "")
-        val abuserScore = d.optString("abuser_score", "")
+        val abuserScoreRaw = intel?.optString("abuser_score_raw", "") ?: ""
+        val abuserScore = d.optString("abuser_score", "") ?: ""
         val abRaw = if (abuserScoreRaw.isNotEmpty()) abuserScoreRaw else abuserScore
         val abPen = when {
             abRaw.isNotEmpty() -> {
@@ -188,8 +188,8 @@ object IpChecker {
             }
         }
 
-        val repThreat = intel?.optString("rep_threat", "")
-        val httpbl = intel?.optString("httpbl_threat", "")
+        val repThreat = intel?.optString("rep_threat", "") ?: ""
+        val httpbl = intel?.optString("httpbl_threat", "") ?: ""
         val hpRaw = if (repThreat.isNotEmpty()) repThreat else httpbl
         val hp = hpRaw.toDoubleOrNull() ?: 0.0
         val hpPen = if (hp > 0) if (hp <= 25) 1.0 else 2.0 else 0.0
