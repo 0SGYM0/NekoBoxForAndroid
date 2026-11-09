@@ -277,9 +277,16 @@ object IpChecker {
             humanPercent = null
             humanLabel = "IPv6 暂不评估"
         } else {
-            val final = humanFromRadar ?: humanAdjust(humanEstimate(d), d).toInt()
+            // Do not treat absent classification fields as evidence of residential traffic.
+            val companyType = d.optString("company_type", "").lowercase()
+            val asnKind = d.optString("asn_kind", "").lowercase()
+            val hasEstimateBasis = companyType in setOf("hosting", "business", "isp", "residential") ||
+                asnKind in setOf("mobile", "hosting", "cdn", "isp", "residential") ||
+                listOf("is_public_service", "is_crawler", "is_mobile", "is_datacenter", "isResidential").any { d.optBoolean(it) }
+            val final = humanFromRadar ?: if (hasEstimateBasis) humanAdjust(humanEstimate(d), d).toInt() else null
             humanPercent = final
             humanLabel = when {
+                final == null -> ""
                 final >= 55 -> "人类偏多"
                 final >= 40 -> "人机混合"
                 else -> "机器偏多"
