@@ -536,4 +536,7 @@
     <string name="ipcheck_human_ratio">人类 %1$d%%  /  机器 %2$d%%</string>
     <string name="ipcheck_human_caveat">雷达数据缺失时，人机比例为估算值。</string>
     <string name="ipcheck_scene_caveat">基于规则的估算，仅供参考，不代表服务实际可用。</string>
+    <string name="ipcheck_human_scenes">人机 / 场景</string>
+    <string name="ipcheck_region_restricted">受限（%1$s）</string>
+    <string name="ipcheck_region_not_listed">未列为受限</string>
 </resources>

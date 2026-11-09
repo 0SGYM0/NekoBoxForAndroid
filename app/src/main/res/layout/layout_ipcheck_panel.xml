@@ -70,51 +70,24 @@
             android:orientation="vertical"
             android:padding="12dp">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                android:text="@string/ipcheck_default_title"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
             <io.nekohasekai.sagernet.ui.IpExitCard
                 android:id="@+id/ipcheck_default"
+                android:tag="@string/ipcheck_default_title"
+                android:layout_marginBottom="10dp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                android:text="@string/ipcheck_chatgpt_title"
-                android:textSize="16sp"
-                android:textStyle="bold" />
 
             <io.nekohasekai.sagernet.ui.IpExitCard
                 android:id="@+id/ipcheck_chatgpt"
+                android:tag="@string/ipcheck_chatgpt_title"
+                android:layout_marginBottom="10dp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                android:text="@string/ipcheck_claude_title"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
             <io.nekohasekai.sagernet.ui.IpExitCard
                 android:id="@+id/ipcheck_claude"
+                android:tag="@string/ipcheck_claude_title"
+                android:layout_marginBottom="10dp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
