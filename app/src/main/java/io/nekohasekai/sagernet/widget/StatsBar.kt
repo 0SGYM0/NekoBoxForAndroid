@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.text.format.Formatter
 import android.util.AttributeSet
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
@@ -27,9 +29,31 @@ class StatsBar @JvmOverloads constructor(
     private lateinit var statusText: TextView
     private lateinit var txText: TextView
     private lateinit var rxText: TextView
+    private lateinit var ipSummaryText: TextView
     private lateinit var behavior: YourBehavior
 
     var allowShow = true
+
+    /** 上滑手势回调（用于展开 IP 检测详情） */
+    var onSwipeUp: (() -> Unit)? = null
+
+    private val gestureDetector = GestureDetector(
+        context,
+        object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(
+                e1: MotionEvent?, e2: MotionEvent?,
+                velocityX: Float, velocityY: Float,
+            ): Boolean {
+                if (e1 != null && e2 != null &&
+                    velocityY < -2000 && Math.abs(velocityY) > Math.abs(velocityX)
+                ) {
+                    onSwipeUp?.invoke()
+                    return true
+                }
+                return false
+            }
+        },
+    )
 
     override fun getBehavior(): YourBehavior {
         if (!this::behavior.isInitialized) behavior = YourBehavior { allowShow }
@@ -72,7 +96,24 @@ class StatsBar @JvmOverloads constructor(
         statusText = findViewById(R.id.status)
         txText = findViewById(R.id.tx)
         rxText = findViewById(R.id.rx)
+        ipSummaryText = findViewById(R.id.ip_summary)
         super.setOnClickListener(l)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        gestureDetector.onTouchEvent(event)
+        return super.onTouchEvent(event)
+    }
+
+    /** 更新右侧 IP 摘要（如「GPT 81 纯净」）；传空字符串则隐藏 */
+    fun updateIpSummary(text: CharSequence) {
+        if (!this::ipSummaryText.isInitialized) return
+        if (text.isEmpty()) {
+            ipSummaryText.visibility = View.GONE
+        } else {
+            ipSummaryText.visibility = View.VISIBLE
+            ipSummaryText.text = text
+        }
     }
 
     private fun setStatus(text: CharSequence) {

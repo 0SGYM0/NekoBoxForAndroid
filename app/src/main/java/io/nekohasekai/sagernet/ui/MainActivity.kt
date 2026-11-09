@@ -40,6 +40,7 @@ import io.nekohasekai.sagernet.fmt.KryoConverters
 import io.nekohasekai.sagernet.fmt.PluginEntry
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
+import io.nekohasekai.sagernet.ipcheck.IpChecker
 import io.nekohasekai.sagernet.ktx.alert
 import io.nekohasekai.sagernet.ktx.isPlay
 import io.nekohasekai.sagernet.ktx.isPreview
@@ -92,6 +93,7 @@ class MainActivity : ThemedActivity(),
             )
         }
         binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
+        binding.stats.onSwipeUp = { displayFragment(IpCheckFragment()) }
 
         setContentView(binding.root)
         changeState(BaseService.State.Idle)
@@ -367,7 +369,31 @@ class MainActivity : ThemedActivity(),
 
         binding.fab.changeState(state, DataStore.serviceState, animate)
         binding.stats.changeState(state)
+        if (state == BaseService.State.Connected) {
+            updateIpSummary()
+        } else {
+            binding.stats.updateIpSummary("")
+        }
         if (msg != null) snackbar(getString(R.string.vpn_error, msg)).show()
+    }
+
+    /** 连接成功后，后台检测出口 IP 并在状态栏右侧显示 ChatGPT 纯净度摘要 */
+    private fun updateIpSummary() {
+        if (!DataStore.serviceState.connected) return
+        runOnDefaultDispatcher {
+            try {
+                val result = IpChecker.detect()
+                val gpt = result.chatgpt
+                val summary = "GPT ${gpt.trustScore} ${gpt.scoreLabel}"
+                onMainDispatcher {
+                    binding.stats.updateIpSummary(summary)
+                }
+            } catch (e: Exception) {
+                onMainDispatcher {
+                    binding.stats.updateIpSummary("")
+                }
+            }
+        }
     }
 
     override fun snackbarInternal(text: CharSequence): Snackbar {
