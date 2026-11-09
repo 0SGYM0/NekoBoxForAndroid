@@ -17,6 +17,7 @@ import android.widget.TextView
 import com.google.android.material.card.MaterialCardView
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.ipcheck.IpReport
+import io.nekohasekai.sagernet.ipcheck.ServiceRegion
 import java.util.Locale
 
 /** Presentation only; each exit owns one always-expanded card. */
@@ -64,14 +65,32 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
         header(box)
         box.addView(text(message, 13f, secondary = true).apply { setPadding(0, dp(7), 0, 0) })
     }
-    fun showReport(r: IpReport) {
+    fun showReport(r: IpReport, service: ServiceRegion.Service = ServiceRegion.Service.DEFAULT) {
         clear()
         val unknown = context.getString(R.string.ipcheck_unknown)
         fun known(s: String): String = s.trim().takeUnless { it.isEmpty() || it.equals("null", true) } ?: unknown
         val validScore = r.trustScore in 0..100
         val score = if (validScore) listOf("${r.trustScore} / 100", r.scoreLabel.trim()).filter { it.isNotEmpty() }.joinToString(" · ") else unknown
         val box = card()
-        header(box, score)
+        header(box, "${context.getString(R.string.ipcheck_score)} $score")
+        val assessment = ServiceRegion.assess(service, r.ip, r.countryCode, r.trustScore)
+        if (assessment.status != ServiceRegion.Status.NOT_APPLICABLE) {
+            val message = when (assessment.status) {
+                ServiceRegion.Status.RESTRICTED -> context.getString(R.string.ipcheck_service_restricted, r.countryCode.trim().uppercase(Locale.ROOT))
+                ServiceRegion.Status.NOT_LISTED -> context.getString(R.string.ipcheck_service_not_listed)
+                else -> context.getString(R.string.ipcheck_service_unknown)
+            }
+            box.addView(text(message, 14f, true).apply {
+                setPadding(dp(8), dp(7), dp(8), dp(7))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(6).toFloat()
+                    setStroke(dp(2), color(if (assessment.status == ServiceRegion.Status.RESTRICTED) com.google.android.material.R.attr.colorError else com.google.android.material.R.attr.colorOutline))
+                }
+            }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(7) })
+            val siteScore = assessment.siteScore?.let { "$it / 100" } ?: unknown
+            row(box, context.getString(R.string.ipcheck_site_score), siteScore)
+            box.addView(text(context.getString(R.string.ipcheck_site_caveat), 12f, secondary = true))
+        }
         box.addView(text(known(r.ip), 19f, true).apply {
             setPadding(0, dp(8), 0, 0)
             setTextIsSelectable(true)
@@ -108,13 +127,6 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
             if (human != null) box.addView(text(context.getString(R.string.ipcheck_human_caveat), 11f, secondary = true).apply { setPadding(0, dp(3), 0, 0) })
             if (r.scenes.isNotEmpty()) box.addView(text(context.getString(R.string.ipcheck_scene_caveat), 11f, secondary = true))
         }
-        val cc = r.countryCode.trim().uppercase(Locale.ROOT)
-        val region = when {
-            !cc.matches(Regex("[A-Z]{2}")) -> unknown
-            r.aiRestricted -> context.getString(R.string.ipcheck_region_restricted, r.aiRestrictedName?.takeIf { it.isNotBlank() } ?: cc)
-            else -> context.getString(R.string.ipcheck_region_not_listed)
-        }
-        row(box, context.getString(R.string.ipcheck_ai_region), region)
     }
 }
 

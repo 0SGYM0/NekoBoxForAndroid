@@ -512,7 +512,15 @@
     <string name="ipcheck_chatgpt_title">ChatGPT 出口</string>
     <string name="ipcheck_claude_title">Claude 出口</string>
     <string name="ipcheck_geo">归属地</string>
-    <string name="ipcheck_score">纯净度</string>
+    <string name="ipcheck_score">IP 纯净度</string>
+    <string name="ipcheck_service_restricted">⚠ 地区受限（%1$s）：原站规则列为受限</string>
+    <string name="ipcheck_service_not_listed">地区未列入原站受限名单（非可用性保证）</string>
+    <string name="ipcheck_service_unknown">地区状态未知</string>
+    <string name="ipcheck_site_score">原站服务场景评分</string>
+    <string name="ipcheck_site_caveat">按原站地区规则估算，非实时访问检测；不预测账号结果。</string>
+    <string name="ipcheck_bar_restricted">GPT ⚠ 地区受限</string>
+    <string name="ipcheck_bar_not_listed">GPT 地区未列受限</string>
+    <string name="ipcheck_bar_unknown">GPT 地区未知</string>
     <string name="ipcheck_native">原生 IP</string>
     <string name="ipcheck_broadcast">广播 IP</string>
     <string name="ipcheck_native_label">原生性</string>

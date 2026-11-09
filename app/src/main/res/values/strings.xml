@@ -592,7 +592,15 @@
     <string name="ipcheck_chatgpt_title">ChatGPT Exit</string>
     <string name="ipcheck_claude_title">Claude Exit</string>
     <string name="ipcheck_geo">Location</string>
-    <string name="ipcheck_score">Trust Score</string>
+    <string name="ipcheck_score">IP reputation</string>
+    <string name="ipcheck_service_restricted">⚠ Region restricted (%1$s): listed by source rules</string>
+    <string name="ipcheck_service_not_listed">Region not listed as restricted (not an availability guarantee)</string>
+    <string name="ipcheck_service_unknown">Region status unknown</string>
+    <string name="ipcheck_site_score">Source service score</string>
+    <string name="ipcheck_site_caveat">Estimated from source region rules, not a live access test or account outcome prediction.</string>
+    <string name="ipcheck_bar_restricted">GPT ⚠ Region restricted</string>
+    <string name="ipcheck_bar_not_listed">GPT Region not listed</string>
+    <string name="ipcheck_bar_unknown">GPT Region unknown</string>
     <string name="ipcheck_native">Native IP</string>
     <string name="ipcheck_broadcast">Broadcast IP</string>
     <string name="ipcheck_native_label">Nativeness</string>
