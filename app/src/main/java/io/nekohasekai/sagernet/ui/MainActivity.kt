@@ -478,12 +478,23 @@ class MainActivity : ThemedActivity(),
 
     private fun initIpCheckPanel() {
         val panel = binding.ipcheckPanel
-        val maxH = (resources.displayMetrics.heightPixels * 0.8f).toInt()
-        panel.layoutParams = panel.layoutParams.apply { height = maxH }
-        panel.post {
-            panelHeight = panel.height.toFloat()
-            panel.translationY = panelHeight
+        // Use the actual coordinator bounds, not physical display metrics: split-screen,
+        // rotation and system insets can all change the space available to this panel.
+        fun updatePanelHeight(availableHeight: Int) {
+            if (availableHeight <= 0) return
+            val newHeight = (availableHeight * 0.8f).toInt().coerceAtLeast(1)
+            if (panelHeight == newHeight.toFloat()) return
+            panel.animate().cancel()
+            val hiddenFraction = if (panel.visibility != View.VISIBLE || panelHeight <= 0f) 1f
+                else (panel.translationY / panelHeight).coerceIn(0f, 1f)
+            panelHeight = newHeight.toFloat()
+            panel.layoutParams = panel.layoutParams.apply { height = newHeight }
+            panel.translationY = panelHeight * hiddenFraction
         }
+        binding.coordinator.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (bottom - top != oldBottom - oldTop) updatePanelHeight(bottom - top)
+        }
+        binding.coordinator.post { updatePanelHeight(binding.coordinator.height) }
         binding.stats.setPanelDragHandle(panel.findViewById(R.id.ipcheck_drag_handle))
         panel.findViewById<TextView>(R.id.ipcheck_refresh).setOnClickListener { requestIpCheck(forceRefresh = true) }
     }
