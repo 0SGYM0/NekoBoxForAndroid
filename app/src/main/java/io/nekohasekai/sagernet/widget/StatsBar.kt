@@ -41,12 +41,10 @@ class StatsBar @JvmOverloads constructor(
         context,
         object : GestureDetector.SimpleOnGestureListener() {
             override fun onFling(
-                e1: MotionEvent?, e2: MotionEvent?,
+                e1: MotionEvent, e2: MotionEvent,
                 velocityX: Float, velocityY: Float,
             ): Boolean {
-                if (e1 != null && e2 != null &&
-                    velocityY < -2000 && Math.abs(velocityY) > Math.abs(velocityX)
-                ) {
+                if (velocityY < -2000 && Math.abs(velocityY) > Math.abs(velocityX)) {
                     onSwipeUp?.invoke()
                     return true
                 }
