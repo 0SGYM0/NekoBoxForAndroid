@@ -10,6 +10,14 @@ plugins {
 setupApp()
 
 android {
+    defaultConfig {
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".inflationtest"
+        }
+    }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
     }
@@ -41,6 +49,8 @@ android {
 dependencies {
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
     implementation(fileTree("libs"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")

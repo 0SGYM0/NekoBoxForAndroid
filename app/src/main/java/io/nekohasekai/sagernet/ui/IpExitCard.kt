@@ -39,7 +39,7 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
             radius = dp(14).toFloat(); cardElevation = dp(1).toFloat()
             setCardBackgroundColor(color(com.google.android.material.R.attr.colorSurface))
             strokeWidth = dp(1)
-            strokeColor = color(com.google.android.material.R.attr.colorOutline).let { if (it == 0) color(android.R.attr.textColorSecondary) else it }
+            strokeColor = color(android.R.attr.textColorSecondary)
         }
         val box = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dp(14), dp(12), dp(14), dp(12)) }
         card.addView(box)
@@ -84,7 +84,7 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
                 setPadding(dp(8), dp(7), dp(8), dp(7))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(6).toFloat()
-                    setStroke(dp(2), color(if (assessment.status == ServiceRegion.Status.RESTRICTED) com.google.android.material.R.attr.colorError else com.google.android.material.R.attr.colorOutline))
+                    setStroke(dp(2), color(if (assessment.status == ServiceRegion.Status.RESTRICTED) com.google.android.material.R.attr.colorError else android.R.attr.textColorSecondary))
                 }
             }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(7) })
             val siteScore = assessment.siteScore?.let { "$it / 100" } ?: unknown
@@ -103,7 +103,7 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
             setPadding(dp(8), dp(3), dp(8), dp(3))
             background = GradientDrawable().apply {
                 cornerRadius = dp(6).toFloat()
-                setStroke(dp(1), color(com.google.android.material.R.attr.colorOutline).let { if (it == 0) color(android.R.attr.textColorSecondary) else it })
+                setStroke(dp(1), color(android.R.attr.textColorSecondary))
             }
         }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
         if (validScore) box.addView(ScoreScale(context, r.trustScore), LayoutParams(LayoutParams.MATCH_PARENT, dp(12)))
