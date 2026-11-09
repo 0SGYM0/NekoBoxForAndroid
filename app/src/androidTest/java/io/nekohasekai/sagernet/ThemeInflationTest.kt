@@ -49,6 +49,15 @@ class ThemeInflationTest {
                     }
                     val root = try { LayoutInflater.from(context).inflate(R.layout.layout_main, null, false) }
                     catch (e: Exception) { throw AssertionError("inflate failed: $name night=$night", e) }
+                    val panel = root.findViewById<android.view.ViewGroup>(R.id.ipcheck_panel)
+                    for ((width, height) in listOf(320 to 180, 320 to 600, 800 to 360)) {
+                        panel.measure(android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY),
+                            android.view.View.MeasureSpec.makeMeasureSpec(height, android.view.View.MeasureSpec.EXACTLY))
+                        panel.layout(0, 0, width, height)
+                        val handle = panel.findViewById<android.view.View>(R.id.ipcheck_drag_handle)
+                        assertTrue("handle missing at $width x $height", handle.height > 0 && handle.bottom <= height)
+                        assertTrue("panel blank at $width x $height", panel.getChildAt(0).height > 0)
+                    }
                     val notice = root.findViewById<TextView>(R.id.ipcheck_notice)
                     assertNotNull(notice)
                     assertTrue(notice.parent is MaterialCardView)
