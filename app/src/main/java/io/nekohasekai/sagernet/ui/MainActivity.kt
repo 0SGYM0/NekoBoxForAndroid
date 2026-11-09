@@ -53,7 +53,6 @@ import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.parseProxies
 import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import moe.matsuri.nb4a.utils.Util
@@ -383,7 +382,7 @@ class MainActivity : ThemedActivity(),
     private var ipGeneration = 0L
     private var ipRequestId = 0L
     private var ipCheckJob: Job? = null
-    private var cachedIpResult: IpChecker.DetectResult? = null
+    private var cachedIpResult: Map<IpChecker.Exit, Result<io.nekohasekai.sagernet.ipcheck.IpReport>>? = null
 
     private fun changeState(
         state: BaseService.State,
@@ -421,39 +420,28 @@ class MainActivity : ThemedActivity(),
             setPanelStatus(R.string.ipcheck_status_disconnected)
             return
         }
-        // Repeated opens/refreshes while a request is running join that request.
-        if (ipCheckJob?.isActive == true) return
-        if (!forceRefresh && cachedIpResult != null) {
-            renderIpCheck(cachedIpResult!!)
-            setPanelStatus(R.string.ipcheck_status_done)
-            return
-        }
+        if (ipCheckJob?.isActive == true && !forceRefresh) return
+        if (!forceRefresh && cachedIpResult != null) return
 
+        // Advance the request before cancelling: blocking native IO may finish later.
+        val requestId = ++ipRequestId
+        ipCheckJob?.cancel()
+        val generation = ipGeneration
         cachedIpResult = null
         clearIpCheckDisplay()
+        IpChecker.Exit.values().forEach { exit -> ipExitView(exit).setText(R.string.ipcheck_status_detecting) }
         setPanelStatus(R.string.ipcheck_status_detecting)
-        val generation = ipGeneration
-        val requestId = ++ipRequestId
         ipCheckJob = lifecycleScope.launch {
-            try {
-                val result = IpChecker.detect()
-                if (!isCurrentIpCheck(generation, requestId)) return@launch
-                cachedIpResult = result
-                val gpt = result.chatgpt
-                val summary = if (gpt.trustScore >= 0) {
-                    "GPT ${gpt.trustScore} ${gpt.scoreLabel}".trimEnd()
-                } else ""
-                binding.stats.updateIpSummary(summary)
-                renderIpCheck(result)
-                setPanelStatus(R.string.ipcheck_status_done)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                if (!isCurrentIpCheck(generation, requestId)) return@launch
-                cachedIpResult = null
-                clearIpCheckDisplay()
-                binding.ipcheckPanel.findViewById<TextView>(R.id.ipcheck_status).text =
-                    getString(R.string.ipcheck_status_error, getString(R.string.ipcheck_retry_hint))
+            val results = mutableMapOf<IpChecker.Exit, Result<io.nekohasekai.sagernet.ipcheck.IpReport>>()
+            IpChecker.detectEach { exit, result ->
+                if (isCurrentIpCheck(generation, requestId)) {
+                    results[exit] = result
+                    renderIpExit(exit, result)
+                }
+            }
+            if (isCurrentIpCheck(generation, requestId)) {
+                cachedIpResult = results.toMap()
+                setPanelStatus(if (results.values.any { it.isFailure }) R.string.ipcheck_status_partial else R.string.ipcheck_status_done)
             }
         }
     }
@@ -541,11 +529,21 @@ class MainActivity : ThemedActivity(),
         }.start()
     }
 
-    private fun renderIpCheck(result: IpChecker.DetectResult) {
-        val panel = binding.ipcheckPanel
-        panel.findViewById<TextView>(R.id.ipcheck_default).text = IpReportRenderer.render(this, result.default)
-        panel.findViewById<TextView>(R.id.ipcheck_chatgpt).text = IpReportRenderer.render(this, result.chatgpt)
-        panel.findViewById<TextView>(R.id.ipcheck_claude).text = IpReportRenderer.render(this, result.claude)
+    private fun ipExitView(exit: IpChecker.Exit): TextView = binding.ipcheckPanel.findViewById(when (exit) {
+        IpChecker.Exit.DEFAULT -> R.id.ipcheck_default
+        IpChecker.Exit.CHATGPT -> R.id.ipcheck_chatgpt
+        IpChecker.Exit.CLAUDE -> R.id.ipcheck_claude
+    })
+
+    private fun renderIpExit(exit: IpChecker.Exit, result: Result<io.nekohasekai.sagernet.ipcheck.IpReport>) {
+        val report = result.getOrNull()
+        ipExitView(exit).text = if (report != null) IpReportRenderer.render(this, report)
+            else getString(R.string.ipcheck_status_error, getString(R.string.ipcheck_retry_hint))
+        if (exit == IpChecker.Exit.CHATGPT) {
+            val summary = if (report != null && report.trustScore >= 0)
+                "GPT ${report.trustScore} ${report.scoreLabel}".trimEnd() else ""
+            binding.stats.updateIpSummary(summary)
+        }
     }
 
     private fun setPanelStatus(resId: Int) {

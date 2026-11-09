@@ -328,24 +328,28 @@ object IpChecker {
         coroutineContext.ensureActive()
         val d = lookupJson(ip)
         coroutineContext.ensureActive()
-        val asn = d.optString("asn", "")
-        val human = if (asn.isNotEmpty()) radarHuman(asn) else null
+        val asn = if (d.isNull("asn")) "" else d.optString("asn", "").trim()
+        // For ordinary IPv6 the renderer does not use radar data. Public services
+        // remain evaluated, preserving the existing scoring behaviour.
+        val needsRadar = !ip.contains(":") || d.optBoolean("is_public_service")
+        val human = if (needsRadar && asn.matches(Regex("(?i)(AS)?[0-9]+"))) radarHuman(asn) else null
         coroutineContext.ensureActive()
         return buildReport(ip, d, human)
     }
 
-    data class DetectResult(
-        val default: IpReport,
-        val chatgpt: IpReport,
-        val claude: IpReport,
-    )
+    enum class Exit { DEFAULT, CHATGPT, CLAUDE }
 
-    suspend fun detect(): DetectResult = withContext(Dispatchers.IO) {
-        DetectResult(
-            default = detectOne(TRACE_DEFAULT),
-            chatgpt = detectOne(TRACE_CHATGPT),
-            claude = detectOne(TRACE_CLAUDE),
-        )
+    /** Callback runs in the caller's context, once per completed exit. */
+    suspend fun detectEach(publish: (Exit, Result<IpReport>) -> Unit) {
+        parallelChecks(Exit.values().toList(), { exit ->
+            withContext(Dispatchers.IO) {
+                detectOne(when (exit) {
+                    Exit.DEFAULT -> TRACE_DEFAULT
+                    Exit.CHATGPT -> TRACE_CHATGPT
+                    Exit.CLAUDE -> TRACE_CLAUDE
+                })
+            }
+        }, publish)
     }
 }
 

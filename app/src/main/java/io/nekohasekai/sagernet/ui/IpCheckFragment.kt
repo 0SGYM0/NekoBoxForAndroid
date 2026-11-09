@@ -14,8 +14,9 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ipcheck.IpChecker
 import io.nekohasekai.sagernet.ipcheck.IpReport
 import io.nekohasekai.sagernet.ipcheck.SceneScore
-import io.nekohasekai.sagernet.ktx.onMainDispatcher
-import io.nekohasekai.sagernet.ktx.runOnLifecycleDispatcher
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 class IpCheckFragment : BottomSheetDialogFragment() {
 
@@ -26,6 +27,20 @@ class IpCheckFragment : BottomSheetDialogFragment() {
     private var swipe: SwipeRefreshLayout? = null
 
     private var autoChecked = false
+    private var requestId = 0L
+    private var checkJob: Job? = null
+
+    override fun onDestroyView() {
+        requestId++
+        checkJob?.cancel()
+        checkJob = null
+        defaultText = null
+        chatgptText = null
+        claudeText = null
+        statusText = null
+        swipe = null
+        super.onDestroyView()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?,
@@ -68,33 +83,38 @@ class IpCheckFragment : BottomSheetDialogFragment() {
     }
 
     private fun startDetect() {
+        val id = ++requestId
+        checkJob?.cancel()
         if (!DataStore.serviceState.connected) {
             statusText?.setText(R.string.ipcheck_status_disconnected)
             swipe?.isRefreshing = false
             return
         }
         statusText?.setText(R.string.ipcheck_status_detecting)
-        runOnLifecycleDispatcher {
-            try {
-                val result = IpChecker.detect()
-                onMainDispatcher {
-                    render(result)
-                    statusText?.setText(R.string.ipcheck_status_done)
-                    swipe?.isRefreshing = false
-                }
-            } catch (e: Exception) {
-                onMainDispatcher {
-                    statusText?.text = getString(R.string.ipcheck_status_error, e.message ?: "")
-                    swipe?.isRefreshing = false
+        listOf(defaultText, chatgptText, claudeText).forEach { it?.setText(R.string.ipcheck_status_detecting) }
+        checkJob = viewLifecycleOwner.lifecycleScope.launch {
+            var failed = false
+            IpChecker.detectEach { exit, result ->
+                if (id == requestId && DataStore.serviceState.connected) {
+                    val target = when (exit) {
+                        IpChecker.Exit.DEFAULT -> defaultText
+                        IpChecker.Exit.CHATGPT -> chatgptText
+                        IpChecker.Exit.CLAUDE -> claudeText
+                    }
+                    val report = result.getOrNull()
+                    if (report == null) failed = true
+                    target?.text = if (report != null) renderReport(report)
+                        else getString(R.string.ipcheck_status_error, getString(R.string.ipcheck_retry_hint))
                 }
             }
+            if (id == requestId && DataStore.serviceState.connected) {
+                statusText?.setText(if (failed) R.string.ipcheck_status_partial else R.string.ipcheck_status_done)
+                swipe?.isRefreshing = false
+            } else if (id == requestId) {
+                statusText?.setText(R.string.ipcheck_status_disconnected)
+                swipe?.isRefreshing = false
+            }
         }
-    }
-
-    private fun render(result: IpChecker.DetectResult) {
-        defaultText?.text = renderReport(result.default)
-        chatgptText?.text = renderReport(result.chatgpt)
-        claudeText?.text = renderReport(result.claude)
     }
 
     private fun renderReport(r: IpReport): String {
