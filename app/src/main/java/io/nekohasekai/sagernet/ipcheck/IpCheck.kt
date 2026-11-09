@@ -3,7 +3,9 @@ package io.nekohasekai.sagernet.ipcheck
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 import libcore.Libcore
 import moe.matsuri.nb4a.utils.Util
 import org.json.JSONObject
@@ -92,7 +94,9 @@ object IpChecker {
 
     private fun httpGet(url: String): String {
         val resp = Libcore.newHttpClient().apply {
-            trySocks5(DataStore.mixedPort)
+            requireSocks5(DataStore.mixedPort)
+            setTimeoutMillis(8000)
+            setMaxResponseBytes(262144)
         }.newRequest().apply {
             setURL(url)
             setUserAgent(USER_AGENT)
@@ -318,11 +322,15 @@ object IpChecker {
         )
     }
 
-    private fun detectOne(traceUrl: String): IpReport {
+    private suspend fun detectOne(traceUrl: String): IpReport {
+        coroutineContext.ensureActive()
         val ip = getExitIp(traceUrl)
+        coroutineContext.ensureActive()
         val d = lookupJson(ip)
+        coroutineContext.ensureActive()
         val asn = d.optString("asn", "")
         val human = if (asn.isNotEmpty()) radarHuman(asn) else null
+        coroutineContext.ensureActive()
         return buildReport(ip, d, human)
     }
 

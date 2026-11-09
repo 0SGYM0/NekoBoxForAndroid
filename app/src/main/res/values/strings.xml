@@ -586,6 +586,7 @@
     <string name="ipcheck_status_detecting">Checking…</string>
     <string name="ipcheck_status_done">Check complete</string>
     <string name="ipcheck_status_error">Check failed: %s</string>
+    <string name="ipcheck_retry_hint">Check the proxy connection and try again</string>
     <string name="ipcheck_default_title">Default Exit</string>
     <string name="ipcheck_chatgpt_title">ChatGPT Exit</string>
     <string name="ipcheck_claude_title">Claude Exit</string>

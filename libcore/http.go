@@ -37,6 +37,9 @@ type HTTPClient interface {
 	PinnedTLS12()
 	PinnedSHA256(sumHex string)
 	TrySocks5(port int32)
+	RequireSocks5(port int32)
+	SetTimeoutMillis(timeoutMillis int32)
+	SetMaxResponseBytes(maxBytes int32)
 	TryH3Direct()
 	KeepAlive()
 	NewRequest() HTTPRequest
@@ -71,8 +74,10 @@ type httpClient struct {
 	tls           tls.Config
 	h1h2Transport http.Transport
 	h1h2Client    http.Client
-	trySocks5     bool
-	tryH3Direct   bool
+	trySocks5       bool
+	tryH3Direct     bool
+	requireSocks5   bool
+	maxResponseBytes int64
 }
 
 func NewHttpClient() HTTPClient {
@@ -115,6 +120,10 @@ func (c *httpClient) PinnedSHA256(sumHex string) {
 }
 
 func (c *httpClient) TrySocks5(port int32) {
+	if c.requireSocks5 {
+		c.RequireSocks5(port)
+		return
+	}
 	dialer := new(net.Dialer)
 	c.h1h2Transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		for {
@@ -137,6 +146,73 @@ func (c *httpClient) TrySocks5(port int32) {
 		return dialer.DialContext(ctx, network, addr)
 	}
 	c.trySocks5 = true
+}
+
+// RequireSocks5 routes every HTTP request through the local SOCKS5 listener.
+// Unlike TrySocks5, connection or handshake failures never fall back to direct.
+// Configure clients before starting requests; these methods are not concurrent-safe.
+func (c *httpClient) RequireSocks5(port int32) {
+	c.requireSocks5 = true
+	c.trySocks5 = true
+	c.h1h2Transport.Proxy = nil
+	c.h1h2Client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return errors.New("redirects disabled in strict SOCKS5 mode")
+	}
+	c.h1h2Transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if port < 1 || port > 65535 {
+			return nil, errors.New("invalid SOCKS5 port")
+		}
+		timeout := c.h1h2Client.Timeout
+		conn, err := (&net.Dialer{Timeout: timeout}).DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port))))
+		if err != nil {
+			return nil, fmt.Errorf("SOCKS5 connect: %w", err)
+		}
+		if timeout > 0 {
+			if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+				_ = conn.Close()
+				return nil, err
+			}
+		}
+		// SOCKS handshakes operate on net.Conn, so close it if the dial context
+		// expires or is cancelled. This also prevents stalled handshakes leaking.
+		stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+		_, err = socks.ClientHandshake5(conn, socks5.CommandConnect, metadata.ParseSocksaddr(addr), "", "")
+		if !stop() {
+			_ = conn.Close()
+			return nil, ctx.Err()
+		}
+		if err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("SOCKS5 handshake: %w", err)
+		}
+		if timeout > 0 {
+			if err := conn.SetDeadline(time.Time{}); err != nil {
+				_ = conn.Close()
+				return nil, err
+			}
+		}
+		return conn, nil
+	}
+}
+
+// SetTimeoutMillis bounds a complete HTTP exchange, including response body reads.
+// A non-positive value restores the default of no timeout.
+func (c *httpClient) SetTimeoutMillis(timeoutMillis int32) {
+	if timeoutMillis <= 0 {
+		c.h1h2Client.Timeout = 0
+		return
+	}
+	c.h1h2Client.Timeout = time.Duration(timeoutMillis) * time.Millisecond
+}
+
+// SetMaxResponseBytes limits bodies read by GetContent/GetContentString.
+// A non-positive value restores the default of no limit. WriteTo is not limited.
+func (c *httpClient) SetMaxResponseBytes(maxBytes int32) {
+	if maxBytes <= 0 {
+		c.maxResponseBytes = 0
+		return
+	}
+	c.maxResponseBytes = int64(maxBytes)
 }
 
 func (c *httpClient) TryH3Direct() {
@@ -209,18 +285,18 @@ func (r *httpRequest) SetContentString(content string) {
 func (r *httpRequest) Execute() (HTTPResponse, error) {
 	defer device.DeferPanicToError("http execute", func(err error) { log.Println(err) })
 	// full direct
-	if r.tryH3Direct && !r.trySocks5 {
+	if !r.requireSocks5 && r.tryH3Direct && !r.trySocks5 {
 		return r.doH3Direct()
 	}
 	response, err := r.h1h2Client.Do(&r.request)
 	if err != nil {
 		// trySocks5 && tryH3Direct
-		if r.tryH3Direct && errors.Is(err, errFailConnectSocks5) {
+		if !r.requireSocks5 && r.tryH3Direct && errors.Is(err, errFailConnectSocks5) {
 			return r.doH3Direct()
 		}
 		return nil, err
 	}
-	httpResp := &httpResponse{Response: response}
+	httpResp := &httpResponse{Response: response, maxBytes: r.maxResponseBytes}
 	if response.StatusCode != http.StatusOK {
 		return nil, errors.New(httpResp.errorString())
 	}
@@ -346,6 +422,7 @@ type httpResponse struct {
 	*http.Response
 
 	getContentOnce sync.Once
+	maxBytes       int64
 	content        []byte
 	contentError   error
 }
@@ -368,7 +445,15 @@ func (h *httpResponse) GetHeader(key string) *StringBox {
 func (h *httpResponse) GetContent() ([]byte, error) {
 	h.getContentOnce.Do(func() {
 		defer h.Body.Close()
-		h.content, h.contentError = io.ReadAll(h.Body)
+		reader := io.Reader(h.Body)
+		if h.maxBytes > 0 {
+			reader = io.LimitReader(reader, h.maxBytes+1)
+		}
+		h.content, h.contentError = io.ReadAll(reader)
+		if h.contentError == nil && h.maxBytes > 0 && int64(len(h.content)) > h.maxBytes {
+			h.content = nil
+			h.contentError = errors.New("HTTP response body exceeds limit")
+		}
 	})
 	return h.content, h.contentError
 }

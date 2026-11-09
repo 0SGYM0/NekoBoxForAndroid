@@ -16,6 +16,7 @@ import androidx.activity.addCallback
 import androidx.annotation.IdRes
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceDataStore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
@@ -52,6 +53,9 @@ import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.parseProxies
 import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import moe.matsuri.nb4a.utils.Util
 
 class MainActivity : ThemedActivity(),
@@ -83,7 +87,9 @@ class MainActivity : ThemedActivity(),
             displayFragmentWithId(R.id.nav_configuration)
         }
         onBackPressedDispatcher.addCallback {
-            if (supportFragmentManager.findFragmentById(R.id.fragment_holder) is ConfigurationFragment) {
+            if (binding.ipcheckPanel.visibility == View.VISIBLE) {
+                hideIpCheckPanel()
+            } else if (supportFragmentManager.findFragmentById(R.id.fragment_holder) is ConfigurationFragment) {
                 moveTaskToBack(true)
             } else {
                 displayFragmentWithId(R.id.nav_configuration)
@@ -96,8 +102,10 @@ class MainActivity : ThemedActivity(),
             )
         }
         binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
+        binding.stats.onSwipeStart = { onPanelDragStart() }
         binding.stats.onSwipeUp = { dy -> onPanelDrag(dy) }
         binding.stats.onSwipeUpEnd = { dy -> onPanelDragEnd(dy) }
+        binding.stats.onSwipeCancel = { onPanelDragCancel() }
 
         setContentView(binding.root)
         initIpCheckPanel()
@@ -369,6 +377,14 @@ class MainActivity : ThemedActivity(),
         return true
     }
 
+    // These fields and all UI updates are confined to the main thread. A generation
+    // belongs to one connected session; a request ID also invalidates older refreshes.
+    private var ipConnected = false
+    private var ipGeneration = 0L
+    private var ipRequestId = 0L
+    private var ipCheckJob: Job? = null
+    private var cachedIpResult: IpChecker.DetectResult? = null
+
     private fun changeState(
         state: BaseService.State,
         msg: String? = null,
@@ -378,36 +394,87 @@ class MainActivity : ThemedActivity(),
 
         binding.fab.changeState(state, DataStore.serviceState, animate)
         binding.stats.changeState(state)
-        if (state == BaseService.State.Connected) {
-            updateIpSummary()
-        } else {
-            binding.stats.updateIpSummary("")
+        val connected = state == BaseService.State.Connected
+        if (connected != ipConnected) {
+            ipConnected = connected
+            invalidateIpCheck()
+            if (connected) requestIpCheck(forceRefresh = false)
+        } else if (!connected) {
+            setPanelStatus(R.string.ipcheck_status_disconnected)
         }
         if (msg != null) snackbar(getString(R.string.vpn_error, msg)).show()
     }
 
-    /** 连接成功后，后台检测出口 IP 并在状态栏右侧显示 ChatGPT 纯净度摘要 */
-    private fun updateIpSummary() {
-        if (!DataStore.serviceState.connected) return
-        runOnDefaultDispatcher {
+    private fun invalidateIpCheck() {
+        ipGeneration++
+        ipRequestId++
+        ipCheckJob?.cancel()
+        ipCheckJob = null
+        cachedIpResult = null
+        clearIpCheckDisplay()
+        if (!ipConnected) setPanelStatus(R.string.ipcheck_status_disconnected)
+    }
+
+    /** Automatic detection and the panel share one result for this connection. */
+    private fun requestIpCheck(forceRefresh: Boolean) {
+        if (!ipConnected || !DataStore.serviceState.connected) {
+            setPanelStatus(R.string.ipcheck_status_disconnected)
+            return
+        }
+        // Repeated opens/refreshes while a request is running join that request.
+        if (ipCheckJob?.isActive == true) return
+        if (!forceRefresh && cachedIpResult != null) {
+            renderIpCheck(cachedIpResult!!)
+            setPanelStatus(R.string.ipcheck_status_done)
+            return
+        }
+
+        cachedIpResult = null
+        clearIpCheckDisplay()
+        setPanelStatus(R.string.ipcheck_status_detecting)
+        val generation = ipGeneration
+        val requestId = ++ipRequestId
+        ipCheckJob = lifecycleScope.launch {
             try {
                 val result = IpChecker.detect()
+                if (!isCurrentIpCheck(generation, requestId)) return@launch
+                cachedIpResult = result
                 val gpt = result.chatgpt
-                val summary = "GPT ${gpt.trustScore} ${gpt.scoreLabel}"
-                onMainDispatcher {
-                    binding.stats.updateIpSummary(summary)
-                }
+                val summary = if (gpt.trustScore >= 0) {
+                    "GPT ${gpt.trustScore} ${gpt.scoreLabel}".trimEnd()
+                } else ""
+                binding.stats.updateIpSummary(summary)
+                renderIpCheck(result)
+                setPanelStatus(R.string.ipcheck_status_done)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                onMainDispatcher {
-                    binding.stats.updateIpSummary("")
-                }
+                if (!isCurrentIpCheck(generation, requestId)) return@launch
+                cachedIpResult = null
+                clearIpCheckDisplay()
+                binding.ipcheckPanel.findViewById<TextView>(R.id.ipcheck_status).text =
+                    getString(R.string.ipcheck_status_error, getString(R.string.ipcheck_retry_hint))
             }
         }
+    }
+
+    private fun isCurrentIpCheck(generation: Long, requestId: Long): Boolean =
+        ipConnected && DataStore.serviceState.connected &&
+            generation == ipGeneration && requestId == ipRequestId
+
+    private fun clearIpCheckDisplay() {
+        binding.stats.updateIpSummary("")
+        val panel = binding.ipcheckPanel
+        panel.findViewById<TextView>(R.id.ipcheck_default).text = ""
+        panel.findViewById<TextView>(R.id.ipcheck_chatgpt).text = ""
+        panel.findViewById<TextView>(R.id.ipcheck_claude).text = ""
     }
 
     // ============ IP 检测面板（跟手展开） ============
 
     private var panelHeight = 0f
+    private var panelDragStart = 0f
+    private var panelWasOpen = false
 
     private fun initIpCheckPanel() {
         val panel = binding.ipcheckPanel
@@ -417,56 +484,50 @@ class MainActivity : ThemedActivity(),
             panelHeight = panel.height.toFloat()
             panel.translationY = panelHeight
         }
-        panel.findViewById<TextView>(R.id.ipcheck_refresh).setOnClickListener { runIpCheck() }
+        binding.stats.setPanelDragHandle(panel.findViewById(R.id.ipcheck_drag_handle))
+        panel.findViewById<TextView>(R.id.ipcheck_refresh).setOnClickListener { requestIpCheck(forceRefresh = true) }
     }
 
-    private fun onPanelDrag(dy: Float) {
+    private fun onPanelDragStart() {
         val panel = binding.ipcheckPanel
+        panel.animate().cancel()
+        panelWasOpen = panel.visibility == View.VISIBLE && panel.translationY < panelHeight / 2
         if (panel.visibility != View.VISIBLE) {
             panel.visibility = View.VISIBLE
             panel.translationY = panelHeight
         }
-        panel.translationY = (panelHeight - dy).coerceIn(0f, panelHeight)
+        panelDragStart = panel.translationY
+    }
+
+    private fun onPanelDrag(dy: Float) {
+        if (panelHeight <= 0f) return
+        binding.ipcheckPanel.translationY = (panelDragStart - dy).coerceIn(0f, panelHeight)
     }
 
     private fun onPanelDragEnd(dy: Float) {
-        val panel = binding.ipcheckPanel
-        if (dy > panelHeight * 0.25f) {
-            panel.animate().translationY(0f).setDuration(180).start()
-            runIpCheck()
-        } else {
-            panel.animate().translationY(panelHeight).setDuration(180).withEndAction {
-                panel.visibility = View.INVISIBLE
-            }.start()
-        }
+        if (panelHeight <= 0f) return
+        val threshold = minOf(panelHeight * 0.25f, 96f * resources.displayMetrics.density)
+        if (dy > threshold || (dy >= -threshold && panelWasOpen)) showIpCheckPanel() else hideIpCheckPanel()
+    }
+
+    private fun onPanelDragCancel() {
+        if (panelWasOpen) showIpCheckPanel() else hideIpCheckPanel()
     }
 
     private fun showIpCheckPanel() {
         val panel = binding.ipcheckPanel
+        panel.animate().cancel()
         panel.visibility = View.VISIBLE
-        panel.animate().translationY(0f).setDuration(250).start()
-        runIpCheck()
+        panel.animate().translationY(0f).setDuration(200).start()
+        requestIpCheck(forceRefresh = false)
     }
 
-    private fun runIpCheck() {
-        if (!DataStore.serviceState.connected) {
-            setPanelStatus(R.string.ipcheck_status_disconnected)
-            return
-        }
-        setPanelStatus(R.string.ipcheck_status_detecting)
-        runOnDefaultDispatcher {
-            try {
-                val result = IpChecker.detect()
-                onMainDispatcher {
-                    renderIpCheck(result)
-                    setPanelStatus(R.string.ipcheck_status_done)
-                }
-            } catch (e: Exception) {
-                onMainDispatcher {
-                    setPanelStatus(R.string.ipcheck_status_error)
-                }
-            }
-        }
+    private fun hideIpCheckPanel() {
+        val panel = binding.ipcheckPanel
+        panel.animate().cancel()
+        panel.animate().translationY(panelHeight).setDuration(200).withEndAction {
+            panel.visibility = View.INVISIBLE
+        }.start()
     }
 
     private fun renderIpCheck(result: IpChecker.DetectResult) {
