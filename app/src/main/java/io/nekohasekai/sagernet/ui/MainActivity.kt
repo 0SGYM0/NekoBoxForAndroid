@@ -44,6 +44,10 @@ import io.nekohasekai.sagernet.fmt.PluginEntry
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ipcheck.IpChecker
+import io.nekohasekai.sagernet.ipcheck.IpCardOrder
+import io.nekohasekai.sagernet.ipcheck.IpCardStates
+import io.nekohasekai.sagernet.ipcheck.IpCardSummary
+import io.nekohasekai.sagernet.ipcheck.ServiceRegion
 import io.nekohasekai.sagernet.ktx.alert
 import io.nekohasekai.sagernet.ktx.isPlay
 import io.nekohasekai.sagernet.ktx.isPreview
@@ -377,6 +381,9 @@ class MainActivity : ThemedActivity(),
 
     // These fields and all UI updates are confined to the main thread. A generation
     // belongs to one connected session; a request ID also invalidates older refreshes.
+    private var cardOrder = IpCardOrder.default
+    private val cardStates = IpCardStates<io.nekohasekai.sagernet.ipcheck.IpReport>()
+    private var ipDetecting = false
     private var ipConnected = false
     private var ipGeneration = 0L
     private var ipRequestId = 0L
@@ -407,6 +414,8 @@ class MainActivity : ThemedActivity(),
         ipCheckJob?.cancel()
         ipCheckJob = null
         cachedIpResult = null
+        ipDetecting = false
+        cardStates.clear()
         clearIpCheckDisplay()
     }
 
@@ -423,18 +432,24 @@ class MainActivity : ThemedActivity(),
         ipCheckJob?.cancel()
         val generation = ipGeneration
         cachedIpResult = null
+        cardStates.clear()
+        ipDetecting = true
         clearIpCheckDisplay()
+        updateIpBar()
         IpChecker.Exit.values().forEach { exit -> ipExitView(exit).showState(getString(R.string.ipcheck_status_detecting)) }
         ipCheckJob = lifecycleScope.launch {
             val results = mutableMapOf<IpChecker.Exit, Result<io.nekohasekai.sagernet.ipcheck.IpReport>>()
             IpChecker.detectEach { exit, result ->
                 if (isCurrentIpCheck(generation, requestId)) {
                     results[exit] = result
+                    cardStates.put(exit.name, result)
                     renderIpExit(exit, result)
                 }
             }
             if (isCurrentIpCheck(generation, requestId)) {
                 cachedIpResult = results.toMap()
+                ipDetecting = false
+                updateIpBar()
             }
         }
     }
@@ -489,6 +504,7 @@ class MainActivity : ThemedActivity(),
         binding.coordinator.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updatePanelBounds() }
         binding.coordinator.post { updatePanelBounds() }
         androidx.core.view.ViewCompat.requestApplyInsets(binding.coordinator)
+        initCardSorting()
         binding.stats.setPanelDragHandle(panel.findViewById(R.id.ipcheck_drag_handle))
         panel.findViewById<io.nekohasekai.sagernet.widget.PanelScrollView>(R.id.ipcheck_scroll).apply {
             onPanelDragStart = { this@MainActivity.onPanelDragStart() }
@@ -556,18 +572,83 @@ class MainActivity : ThemedActivity(),
         }
         if (report != null) ipExitView(exit).showReport(report, service)
         else ipExitView(exit).showState(getString(R.string.ipcheck_status_error, getString(R.string.ipcheck_retry_hint)))
-        if (exit == IpChecker.Exit.CHATGPT) {
-            val assessment = report?.let { io.nekohasekai.sagernet.ipcheck.ServiceRegion.assess(service, it.ip, it.countryCode, it.trustScore) }
-            val parts = io.nekohasekai.sagernet.ipcheck.IpBarSummary.parts(report?.trustScore, report?.scoreLabel, assessment)
-            val score = parts.score?.toString() ?: getString(R.string.ipcheck_unknown)
-            val suffix = when (parts.region) {
-                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.RESTRICTED -> getString(R.string.ipcheck_bar_suffix_restricted)
-                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.NOT_LISTED -> null
-                io.nekohasekai.sagernet.ipcheck.ServiceRegion.Bar.UNKNOWN -> getString(R.string.ipcheck_bar_suffix_unknown)
-            }
-            binding.stats.updateIpSummary(io.nekohasekai.sagernet.ipcheck.IpBarSummary.format(
-                getString(R.string.ipcheck_bar_score, score), parts.label, suffix))
+        updateIpBar()
+    }
+
+    private fun updateIpBar() {
+        if (!ipConnected) { binding.stats.updateIpSummary(""); return }
+        val exit = IpChecker.Exit.valueOf(cardOrder.first())
+        val name = when (exit) {
+            IpChecker.Exit.DEFAULT -> getString(R.string.ipcheck_default_title)
+            IpChecker.Exit.CHATGPT -> "GPT"
+            IpChecker.Exit.CLAUDE -> "Claude"
         }
+        val result = cardStates.get(exit.name)
+        if (result == null) {
+            binding.stats.updateIpSummary("$name ${getString(if (ipDetecting) R.string.ipcheck_status_detecting else R.string.ipcheck_bar_failed)}")
+            return
+        }
+        val report = result.getOrNull()
+        if (report == null) { binding.stats.updateIpSummary("$name ${getString(R.string.ipcheck_bar_failed)}"); return }
+        val service = when (exit) {
+            IpChecker.Exit.DEFAULT -> ServiceRegion.Service.DEFAULT
+            IpChecker.Exit.CHATGPT -> ServiceRegion.Service.CHATGPT
+            IpChecker.Exit.CLAUDE -> ServiceRegion.Service.CLAUDE
+        }
+        val status = ServiceRegion.assess(service, report.ip, report.countryCode, report.trustScore).status
+        binding.stats.updateIpSummary(IpCardSummary.format(name, report.trustScore, report.scoreLabel, status,
+            getString(R.string.ipcheck_unknown), getString(R.string.ipcheck_bar_suffix_unknown), getString(R.string.ipcheck_bar_suffix_restricted)))
+    }
+
+    private fun initCardSorting() {
+        val cards = binding.ipcheckPanel.findViewById<android.widget.LinearLayout>(R.id.ipcheck_cards)
+        val prefs = getSharedPreferences("ipcheck_order", MODE_PRIVATE)
+        cardOrder = IpCardOrder.decode(prefs.getString("order", null))
+        fun applyOrder(order: List<String>) {
+            cardOrder = order
+            order.forEachIndexed { index, id ->
+                val card = ipExitView(IpChecker.Exit.valueOf(id))
+                cards.removeView(card)
+                cards.addView(card, index)
+            }
+            prefs.edit().putString("order", order.joinToString(",")).apply()
+            updateIpBar()
+        }
+        fun move(id: String, destination: Int) {
+            applyOrder(IpCardOrder.move(cardOrder, cardOrder.indexOf(id), destination))
+        }
+        IpChecker.Exit.values().forEach { exit ->
+            val card = ipExitView(exit)
+            card.onSortClick = {
+                val options = (1..3).map { getString(R.string.ipcheck_sort_position, it) }.toTypedArray()
+                MaterialAlertDialogBuilder(this).setTitle(card.tag.toString()).setItems(options) { _, which -> move(exit.name, which) }.show()
+            }
+            card.onSortLongClick = { handle ->
+                val data = android.content.ClipData.newPlainText("ipcheck-card", exit.name)
+                val shadow = View.DragShadowBuilder(card)
+                if (Build.VERSION.SDK_INT >= 24) handle.startDragAndDrop(data, shadow, exit.name, 0)
+                else @Suppress("DEPRECATION") handle.startDrag(data, shadow, exit.name, 0)
+            }
+        }
+        cards.setOnDragListener { _, event ->
+            when (event.action) {
+                android.view.DragEvent.ACTION_DRAG_STARTED -> event.localState is String && event.localState in cardOrder
+                android.view.DragEvent.ACTION_DROP -> {
+                    val id = event.localState as? String
+                    if (id == null || id !in cardOrder) false else {
+                        val remaining = cardOrder.filter { it != id }
+                        val target = remaining.indexOfFirst { other ->
+                            val view = ipExitView(IpChecker.Exit.valueOf(other))
+                            event.y < view.top + view.height / 2f
+                        }.let { if (it < 0) remaining.size else it }
+                        move(id, target)
+                        true
+                    }
+                }
+                else -> true
+            }
+        }
+        applyOrder(cardOrder)
     }
 
     override fun snackbarInternal(text: CharSequence): Snackbar {

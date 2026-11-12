@@ -42,10 +42,13 @@ class PanelGestureTest {
                     assertNotNull(refresh.drawable)
                     stats.measure(w, View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
                     stats.layout(0, 0, width, stats.measuredHeight)
-                    assertNull(status.ellipsize)
-                    assertEquals(Int.MAX_VALUE, status.maxLines)
-                    assertTrue(summary.lineCount >= 2)
-                    assertEquals(0, status.layout.getEllipsisCount(status.lineCount - 1))
+                    assertEquals(1, status.maxLines)
+                    assertEquals(2, summary.maxLines)
+                    assertTrue(summary.lineCount <= 2)
+                    val beforeHeight = stats.measuredHeight
+                    status.text = "检测中"
+                    stats.measure(w, View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
+                    assertEquals(beforeHeight, stats.measuredHeight)
                 }
             }
         }

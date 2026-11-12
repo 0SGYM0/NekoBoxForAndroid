@@ -167,15 +167,17 @@ class StatsBar @JvmOverloads constructor(
     fun updateIpSummary(text: CharSequence) {
         if (!this::ipSummaryText.isInitialized) return
         if (text.isEmpty()) {
-            ipSummaryText.visibility = View.GONE
+            ipSummaryText.visibility = View.INVISIBLE
         } else {
             ipSummaryText.visibility = View.VISIBLE
             ipSummaryText.text = text
+            ipSummaryText.contentDescription = text
         }
     }
 
     private fun setStatus(text: CharSequence) {
         statusText.text = text
+        statusText.contentDescription = text
         TooltipCompat.setTooltipText(this, text)
     }
 
@@ -214,11 +216,13 @@ class StatsBar @JvmOverloads constructor(
                 R.string.speed, Formatter.formatFileSize(context, txRate)
             )
         }"
+        txText.contentDescription = txText.text
         rxText.text = "▼  ${
             context.getString(
                 R.string.speed, Formatter.formatFileSize(context, rxRate)
             )
         }"
+        rxText.contentDescription = rxText.text
     }
 
     fun testConnection() {

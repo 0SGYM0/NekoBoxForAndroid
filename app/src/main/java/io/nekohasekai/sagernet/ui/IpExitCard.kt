@@ -22,6 +22,8 @@ import java.util.Locale
 
 /** Presentation only; each exit owns one always-expanded card. */
 class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs) {
+    var onSortClick: ((View) -> Unit)? = null
+    var onSortLongClick: ((View) -> Boolean)? = null
     private val content = LinearLayout(context).apply { orientation = VERTICAL }
     init { orientation = VERTICAL; addView(content) }
     private fun dp(v: Int) = (v * resources.displayMetrics.density + .5f).toInt()
@@ -50,6 +52,14 @@ class IpExitCard @JvmOverloads constructor(context: Context, attrs: AttributeSet
         val line = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.TOP }
         line.addView(text(tag?.toString() ?: context.getString(R.string.ipcheck_title), 16f, true), LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         if (score != null) line.addView(text(score, 14f, true).apply { gravity = Gravity.END; setPadding(dp(8), 0, 0, 0) }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        line.addView(TextView(context).apply {
+            text = "☰"
+            gravity = Gravity.CENTER
+            contentDescription = context.getString(R.string.ipcheck_sort_card, this@IpExitCard.tag.toString())
+            isFocusable = true
+            setOnClickListener { onSortClick?.invoke(it) }
+            setOnLongClickListener { onSortLongClick?.invoke(it) ?: false }
+        }, LayoutParams(dp(48), dp(48)))
         box.addView(line)
     }
     private fun row(box: LinearLayout, label: String, value: String) {

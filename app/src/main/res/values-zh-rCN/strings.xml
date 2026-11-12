@@ -551,4 +551,7 @@
     <string name="ipcheck_human_scenes">人机 / 场景</string>
     <string name="ipcheck_region_restricted">受限（%1$s）</string>
     <string name="ipcheck_region_not_listed">未列为受限</string>
+    <string name="ipcheck_sort_card">排序%1$s。长按拖动，或点击选择位置</string>
+    <string name="ipcheck_sort_position">移到第 %1$d 位</string>
+    <string name="ipcheck_bar_failed">失败</string>
 </resources>

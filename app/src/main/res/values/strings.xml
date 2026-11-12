@@ -631,4 +631,7 @@
     <string name="ipcheck_human_scenes">Human / scenes</string>
     <string name="ipcheck_region_restricted">Restricted (%1$s)</string>
     <string name="ipcheck_region_not_listed">Not listed as restricted</string>
+    <string name="ipcheck_sort_card">Reorder %1$s. Long press and drag, or tap for options</string>
+    <string name="ipcheck_sort_position">Move to position %1$d</string>
+    <string name="ipcheck_bar_failed">Failed</string>
 </resources>
