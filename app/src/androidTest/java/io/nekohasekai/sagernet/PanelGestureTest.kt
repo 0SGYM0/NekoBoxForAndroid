@@ -45,7 +45,9 @@ class PanelGestureTest {
                     stats.layout(0, 0, width, stats.measuredHeight)
                     assertEquals(1, status.maxLines)
                     assertEquals(2, summary.maxLines)
-                    assertTrue(summary.height <= summary.lineHeight * 2 + summary.paddingTop + summary.paddingBottom)
+                    val metrics = summary.paint.fontMetricsInt
+                    val fontPadding = (metrics.bottom - metrics.top) - (metrics.descent - metrics.ascent)
+                    assertTrue(summary.height <= summary.lineHeight * 2 + fontPadding + summary.paddingTop + summary.paddingBottom)
                     val beforeHeight = stats.measuredHeight
                     status.text = "检测中"
                     stats.measure(w, View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
