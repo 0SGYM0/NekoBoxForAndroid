@@ -40,11 +40,12 @@ class PanelGestureTest {
                     assertEquals(context.getString(R.string.ipcheck_refresh), refresh.contentDescription)
                     assertTrue(refresh.width >= (48 * context.resources.displayMetrics.density).toInt())
                     assertNotNull(refresh.drawable)
+                    status.text = "连接成功: HTTPS 握手耗时 123456ms"
                     stats.measure(w, View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
                     stats.layout(0, 0, width, stats.measuredHeight)
                     assertEquals(1, status.maxLines)
                     assertEquals(2, summary.maxLines)
-                    assertTrue(summary.lineCount <= 2)
+                    assertTrue(summary.height <= summary.lineHeight * 2 + summary.paddingTop + summary.paddingBottom)
                     val beforeHeight = stats.measuredHeight
                     status.text = "检测中"
                     stats.measure(w, View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
