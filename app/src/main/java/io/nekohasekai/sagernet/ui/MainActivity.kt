@@ -460,7 +460,7 @@ class MainActivity : ThemedActivity(),
 
     private fun clearIpCheckDisplay() {
         binding.stats.updateIpSummary("")
-        IpChecker.Exit.values().forEach { ipExitView(it).clear() }
+        IpChecker.Exit.values().forEach { ipExitView(it).showState(getString(R.string.ipcheck_status_disconnected)) }
     }
 
     // ============ IP 检测面板（跟手展开） ============
